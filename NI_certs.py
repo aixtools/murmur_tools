@@ -22,7 +22,7 @@ if not hasattr(ssl, 'wrap_socket'):
     ssl.wrap_socket = wrap_socket
 
 import pymumble_py3 as pymumble
-from pymumble_py3.callbacks import PYMUMBLE_CLBK_USERCREATED, PYMUMBLE_CLBK_USERUPDATED, PYMUMBLE_CLBK_USERREMOVED
+from pymumble_py3.callbacks import PYMUMBLE_CLBK_USERCREATED, PYMUMBLE_CLBK_USERUPDATED
 import time
 import logging
 import os
@@ -126,27 +126,6 @@ def on_user_updated(user, pos_arguments):
         save_to_json()
         
         logger.info(f"User updated: {user_name} (SESSION: {user_id}, {cert_objf})")
-        logger.info(f"Certificate Hash: {cert_hash}")
-
-def on_user_removed(user, pos_arguments):
-    """Callback when a user's information is updated"""
-    cert_hash = user.get('hash', 'No certificate')
-    cert_objf = cert_hash[:5] + cert_hash[-5:]
-    user_name = user.get('name', 'Unknown')
-    mumble_name = user.get('name', 'Unknown')
-    noise, sep, name = mumble_name.partition('[')
-    user_name = sep + name if sep else mumble_name
-    user_id = user.get('session', 'Unknown ID')
-    
-    if user_id in user_certs:
-        user_certs.pop(user_id)
-        
-        # Add to cert_to_users mapping
-        if cert_hash in cert_to_users:
-            cert_to_users.pop(cert_hash)
-        save_to_json()
-        
-        logger.info(f"User left: {user_name} (SESSION: {user_id}, {cert_objf})")
         logger.info(f"Certificate Hash: {cert_hash}")
 
 def collect_existing_users(mumble):
@@ -266,7 +245,6 @@ def main():
     # Register callbacks
     mumble.callbacks.set_callback(PYMUMBLE_CLBK_USERCREATED, on_user_created)
     mumble.callbacks.set_callback(PYMUMBLE_CLBK_USERUPDATED, on_user_updated)
-    mumble.callbacks.set_callback(PYMUMBLE_CLBK_USERREMOVED, on_user_removed)
     
     # Connect to server
     mumble.start()
