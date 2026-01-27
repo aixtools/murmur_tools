@@ -48,7 +48,6 @@ PORT = 64738  # Default Mumble port
 
 USERNAME = "superuser"  # Change this to your desired username
 # PASSWORD = "EVILiSfuN!"  # Change this if your server requires a password
-PASSWORD = "winwin2024"  # Change this if your server requires a password
 
 PASSWORD = "michael"  # Change this if your server requires a password
 USERNAME = "michael"  # Change this to your desired username
