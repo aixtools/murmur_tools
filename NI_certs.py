@@ -22,7 +22,7 @@ if not hasattr(ssl, 'wrap_socket'):
     ssl.wrap_socket = wrap_socket
 
 import pymumble_py3 as pymumble
-from pymumble_py3.callbacks import PYMUMBLE_CLBK_USERCREATED, PYMUMBLE_CLBK_USERUPDATED
+from pymumble_py3.callbacks import PYMUMBLE_CLBK_USERCREATED, PYMUMBLE_CLBK_USERUPDATED, PYMUMBLE_CLBK_USERREMOVED
 import time
 import logging
 import os
@@ -34,13 +34,14 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from datetime import datetime, timedelta
 
+DEBUG=False
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Mumble server configuration
-SERVER = "voice.wintercoalition.space"  # Change this to your server address
 SERVER = "192.168.129.51"  # Change this to your server address
+SERVER = "voice.wintercoalition.space"  # Change this to your server address
 # SERVER = "voice.insidiousevil.space"  # Change this to your server address
 PORT = 64738  # Default Mumble port
 #USERNAME = "SW81SYs4SA"  # Change this to your desired username
@@ -71,19 +72,54 @@ cert_to_users = {}
 user_certs = {}  # Keep for tracking user_id -> info
 
 
+def dump_object(obj, title=None, logger=print):
+    """
+    Generic, readable dump of an Ice / Mumble proto object.
+    Safe to call from any callback.
+    """
+    if title:
+        logger(f"--- {title} ---")
+    else:
+        logger("--- Object dump ---")
+
+    for attr in sorted(dir(obj)):
+        if attr.startswith("_"):
+            continue
+        try:
+            val = getattr(obj, attr)
+        except Exception:
+            continue
+
+        # skip methods / callables
+        if callable(val):
+            continue
+
+        # shorten noisy binary fields
+        if isinstance(val, (bytes, bytearray)):
+            val = f"<{len(val)} bytes>"
+
+        logger(f"{attr:20}: {val}")
+
+    logger("--------------------")
+
 def on_user_created(user):
     """Callback when a new user joins the server"""
+    if DEBUG:
+        dump_object(
+            user,
+            title="User object received (on_user_created)",
+            logger=logger.info
+        )
+
+    user_id = user.get('session', 'Unknown ID')
     cert_hash = user.get('hash', 'No certificate')
-    cert_objf = cert_hash[:5] + cert_hash[-5:]
     mumble_name = user.get('name', 'Unknown')
     noise, sep, name = mumble_name.partition('[')
-    user_name = sep + name if sep else mumble_name
-    user_id = user.get('session', 'Unknown ID')
+    user_name = sep + name if sep else "[] " + mumble_name 
     
     user_certs[user_id] = {
         'name': user_name,
         'cert_hash': cert_hash,
-        'cert_objf': cert_objf
     }
     
     # Add to cert_to_users mapping
@@ -91,29 +127,37 @@ def on_user_created(user):
         cert_to_users[cert_hash] = []
     if user_name not in cert_to_users[cert_hash]:
         cert_to_users[cert_hash].append(user_name)
-        cert_to_users[cert_hash].append(cert_objf)
     
     save_to_json()
     
-    logger.info(f"User joined: {user_name} (SESSION: {user_id}, {cert_objf})")
-    logger.info(f"Certificate Hash: {cert_hash}")
+    logger.info(f"User joined: (SESSION: {user_id:05}, {cert_hash}) {user_name} ")
+    # logger.info(f"Certificate Hash: {cert_hash}")
 
+
+# def on_user_updated(self, state, context=None):
 
 def on_user_updated(user, pos_arguments):
     """Callback when a user's information is updated"""
+    if DEBUG:
+        dump_object(
+            user,
+            title="UserState received (on_user_updated)",
+            # logger=self.log.info  # or print
+        )
+
     cert_hash = user.get('hash', 'No certificate')
-    cert_objf = cert_hash[:5] + cert_hash[-5:]
-    user_name = user.get('name', 'Unknown')
-    mumble_name = user.get('name', 'Unknown')
-    noise, sep, name = mumble_name.partition('[')
-    user_name = sep + name if sep else mumble_name
     user_id = user.get('session', 'Unknown ID')
+    mumble_name = user.get('name', 'Unknown')
+    # cert_hash = getattr(state, "certhash", None)
+    # user_id = getattr(state, 'session', 'Unknown ID')
+    # mumble_name = getattr(state, 'name', 'Unknown')
+    noise, sep, name = mumble_name.partition('[')
+    user_name = sep + name if sep else "[] " + mumble_name 
     
     if user_id not in user_certs or user_certs[user_id]['cert_hash'] != cert_hash:
         user_certs[user_id] = {
             'name': user_name,
             'cert_hash': cert_hash,
-            'cert_obfu': ('cert_objf', cert_hash)
         }
         
         # Add to cert_to_users mapping
@@ -121,12 +165,41 @@ def on_user_updated(user, pos_arguments):
             cert_to_users[cert_hash] = []
         if user_name not in cert_to_users[cert_hash]:
             cert_to_users[cert_hash].append(user_name)
-            cert_to_users[cert_hash].append(cert_objf)
-        
+
         save_to_json()
-        
-        logger.info(f"User updated: {user_name} (SESSION: {user_id}, {cert_objf})")
-        logger.info(f"Certificate Hash: {cert_hash}")
+    
+    logger.info(f"User update: (SESSION: {user_id:05}, {cert_hash}) {user_name} ")
+    # logger.info(f"Certificate Hash: {cert_hash}")
+
+# def on_user_removed(self, state, context=None):
+def on_user_removed(user, pos_arguments):
+    """Callback when a user leaves the server"""
+    if DEBUG:
+        dump_object(
+            user,
+            title="UserState received (on_user_removed)",
+            # logger=self.log.info  # or print
+        )
+
+    cert_hash = user.get('hash', 'No certificate')
+    user_id = user.get('session', 'Unknown ID')
+    mumble_name = user.get('name', 'Unknown')
+    # cert_hash = getattr(state, "certhash", None)
+    # user_id = getattr(state, 'session', 'Unknown ID')
+    # mumble_name = getattr(state, 'name', 'Unknown')
+    noise, sep, name = mumble_name.partition('[')
+    user_name = sep + name if sep else "[] " + mumble_name
+
+    if user_id in user_certs:
+        user_certs.pop(user_id)
+
+        # Remove (pop) cert_to_users mapping
+        if cert_hash in cert_to_users:
+            cert_to_users.pop(cert_hash)
+        save_to_json()
+
+    logger.info(f"User remove: (SESSION: {user_id:05}, {cert_hash:40}) {user_name} ")
+    # logger.info(f"Certificate Hash: {cert_hash}")
 
 def collect_existing_users(mumble):
     """Collect certificate hashes from users already on the server"""
@@ -134,17 +207,15 @@ def collect_existing_users(mumble):
     
     for user_id, user in mumble.users.items():
         cert_hash = user.get('hash', 'No certificate')
-        cert_objf = cert_hash[:5] + cert_hash[-5:]
         # user_name = user.get('name', 'Unknown')
         mumble_name = user.get('name', 'Unknown')
         noise, sep, name = mumble_name.partition('[')
-        user_name = sep + name if sep else mumble_name
+        user_name = sep + name if sep else "[] " + mumble_name 
         
         if user_id not in user_certs or user_certs[user_id]['cert_hash'] != cert_hash:
             user_certs[user_id] = {
                 'name': user_name,
                 'cert_hash': cert_hash,
-                'cert_obfu': ('cert_objf', cert_hash)
             }
         
             # Add to cert_to_users mapping
@@ -152,14 +223,12 @@ def collect_existing_users(mumble):
                 cert_to_users[cert_hash] = []
             if user_name not in cert_to_users[cert_hash]:
                 cert_to_users[cert_hash].append(user_name)
-                cert_to_users[cert_hash].append(cert_objf)
         
-            logger.info(f"User collected: {user_name} (SESSION: {user_id}, {cert_objf})")
-            logger.info(f"Certificate Hash: {cert_hash}")
+            logger.info(f"User collected: {user_name} (SESSION: {user_id:05}, {cert_hash})")
+            # logger.info(f"Certificate Hash: {cert_hash}")
     
     logger.info(f"\nTotal users found: {len(user_certs)}")
     save_to_json()
-
 
 def save_to_json():
     """Save certificate data to JSON file"""
@@ -245,6 +314,7 @@ def main():
     # Register callbacks
     mumble.callbacks.set_callback(PYMUMBLE_CLBK_USERCREATED, on_user_created)
     mumble.callbacks.set_callback(PYMUMBLE_CLBK_USERUPDATED, on_user_updated)
+    mumble.callbacks.set_callback(PYMUMBLE_CLBK_USERREMOVED, on_user_removed)
     
     # Connect to server
     mumble.start()
