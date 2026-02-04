@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+import sys
+import argparse
+from configparser import ConfigParser
+from pathlib import Path
+
+MURMUR_INI = Path.home() / "mumble-server/mumble-server.ini"
+
+BASE = Path.home() / "prj/evil-mumble"
+ICE_DIR = BASE / "ice"
+
+sys.path.insert(0, str(BASE))
+sys.path.insert(0, str(ICE_DIR))
+
+import Ice
+import MumbleServer
+
+from evil_ice_admin import (
+    list_servers,
+    list_users,
+    add_user,
+    reset_user,
+    remove_user,
+)
+
+def read_murmur_ini(path):
+    cfg = ConfigParser(interpolation=None)
+    with open(path) as f:
+        cfg.read_string("[murmur]\n" + f.read())
+    return cfg["murmur"]
+
+def prompt_name(action):
+    try:
+        name = input(f"{action}: username: ").strip()
+    except EOFError:
+        name = ""
+    if not name:
+        print(f"{action}: no username provided", file=sys.stderr)
+        sys.exit(1)
+    return name
+
+def main():
+    parser = argparse.ArgumentParser(prog="mumble-admin")
+
+    parser.add_argument("--server", nargs="?", help="server id (optional, default: all servers)", const="__ALL__")
+    parser.add_argument("--user", nargs="?", const="__ALL__", help="list users or show one user")
+
+    parser.add_argument("--add-user", nargs="?", const="__PROMPT__")
+    parser.add_argument("--reset-user", nargs="?", const="__PROMPT__")
+    parser.add_argument("--remove-user", nargs="?", const="__PROMPT__")
+
+    args = parser.parse_args()
+
+    cfg = read_murmur_ini(MURMUR_INI)
+    ice_secret = cfg.get("icesecretwrite", fallback=None)
+
+    if not ice_secret:
+        print("missing icesecretwrite in murmur ini", file=sys.stderr)
+        sys.exit(1)
+
+    ice_secret = ice_secret.strip('"')
+
+    # no args at all → help
+    if len(sys.argv) == 1:
+        parser.print_help()
+        return
+
+    with Ice.initialize() as ic:
+        try:
+            meta = MumbleServer.MetaPrx.checkedCast(
+                ic.stringToProxy("Meta:tcp -h 127.0.0.1 -p 6502")
+            )
+        except Ice.ConnectionRefusedException:
+            print("ICE: cannot connect to Murmur (connection refused)", file=sys.stderr)
+            sys.exit(1)
+
+        if not meta:
+            print("ICE: cannot connect to Meta", file=sys.stderr)
+            sys.exit(1)
+
+        if args.server is not None and args.user is None \
+           and args.add_user is None and args.reset_user is None and args.remove_user is None:
+            list_servers(meta)
+            return
+
+        if args.user is not None:
+            list_users(meta, args.server, args.user)
+            return
+
+        if args.add_user is not None:
+            name = prompt_name("add-user") if args.add_user == "__PROMPT__" else args.add_user
+            add_user(meta, name, ice_secret, args.server)
+            return
+
+        if args.reset_user is not None:
+            name = prompt_name("reset-user") if args.reset_user == "__PROMPT__" else args.reset_user
+            reset_user(meta, name, ice_secret, args.server)
+            return
+
+        if args.remove_user is not None:
+            name = prompt_name("remove-user") if args.remove_user == "__PROMPT__" else args.remove_user
+            remove_user(meta, name, ice_secret, args.server)
+            return
+
+if __name__ == "__main__":
+    main()
