@@ -343,9 +343,9 @@ def main():
         # Print summary
         logger.info("\n=== Certificate Summary ===")
         for cert_hash, usernames in cert_to_users.items():
-            logger.info(f"Certificate {cert_hash}:")
+            # logger.info(f"Hash: {cert_hash}:")
             for username in usernames:
-                logger.info(f"  - {username}")
+                logger.info(f"Hash:{cert_hash} - {username}")
         
         logger.info(f"\nData saved to {OUTPUT_FILE}")
         mumble.stop()
