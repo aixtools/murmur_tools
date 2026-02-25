@@ -1,0 +1,65 @@
+Using the files included in the tar file (ask for name)
+
+Scope:
+- Identify all Django model definitions in `models.py`
+- Include related migration files in `migrations/*.py`
+- Follow imports to abstract base models if defined within the repository
+
+For each directory path that contains a `models.py` file:
+
+1. Analyze the models and migrations to infer the database schema.
+2. Extract:
+   - app / directory name
+   - model names
+   - table names (respect Meta.db_table if present)
+   - fields with inferred types, nullability, defaults
+   - primary keys
+   - foreign keys and many-to-many relationships
+   - unmanaged or legacy models (Meta.managed = False)
+   - notes or assumptions inferred from migrations
+
+3. Generate a JSON schema summary.
+
+Output rules:
+- Write one JSON file per directory
+- Base output directory: docs/db/${tarfilename}/models
+- Output filename:
+  - Use the directory name by default
+  - If multiple directories contain models with the same model name, prefix the filename with the nearest unique parent directory
+- Create directories if they do not exist
+- Overwrite existing files
+
+JSON output format (use exactly):
+
+{
+  "directory": "<relative_path_from_BASE>",
+  "models": [
+    {
+      "name": "<ModelName>",
+      "table": "<db_table_or_inferred>",
+      "managed": true,
+      "fields": [
+        {
+          "name": "<field_name>",
+          "type": "<django_field_type>",
+          "nullable": true,
+          "primary_key": false,
+          "default": "<value_or_null>"
+        }
+      ],
+      "relations": [
+        {
+          "type": "ForeignKey|ManyToMany|OneToOne",
+          "target_model": "<app.Model>",
+          "on_delete": "<behavior_if_known>"
+        }
+      ],
+      "notes": [
+        "<freeform assumptions or migration-derived details>"
+      ]
+    }
+  ]
+}
+
+If a directory contains no concrete models (only imports or abstract bases), still generate a file with an empty `models` array.
+
