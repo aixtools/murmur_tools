@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 # Mumble server configuration
 SERVER = "192.168.129.51"  # Change this to your server address
 SERVER = "voice.wintercoalition.space"  # Change this to your server address
+SERVER = "cube-dev.aixtools.com"  # Change this to your server address
 # SERVER = "voice.insidiousevil.space"  # Change this to your server address
 PORT = 64738  # Default Mumble port
 #USERNAME = "SW81SYs4SA"  # Change this to your desired username

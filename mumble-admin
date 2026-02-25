@@ -68,7 +68,7 @@ def main():
     with Ice.initialize() as ic:
         try:
             meta = MumbleServer.MetaPrx.checkedCast(
-                ic.stringToProxy("Meta:tcp -h 127.0.0.1 -p 6502")
+                ic.stringToProxy("Meta:tcp -h 192.168.129.51 -p 6502")
             )
         except Ice.ConnectionRefusedException:
             print("ICE: cannot connect to Murmur (connection refused)", file=sys.stderr)
