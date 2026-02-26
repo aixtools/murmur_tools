@@ -29,6 +29,40 @@ def select_servers(meta, server_id):
     return [(sid, servers[sid])]
 
 
+# ---------- debug: registration display ----------
+
+# UserInfo enum value → readable name.
+# getRegistration intentionally omits UserPassword and UserKDFIterations (server-side security).
+_INFO_NAMES = {
+    MumbleServer.UserInfo.UserName:          "UserName",
+    MumbleServer.UserInfo.UserEmail:         "UserEmail",
+    MumbleServer.UserInfo.UserComment:       "UserComment",
+    MumbleServer.UserInfo.UserHash:          "UserHash",
+    MumbleServer.UserInfo.UserPassword:      "UserPassword",
+    MumbleServer.UserInfo.UserLastActive:    "UserLastActive",
+    MumbleServer.UserInfo.UserKDFIterations: "UserKDFIterations",
+}
+
+def _show_registration(server, uid, label, ctx=None):
+    """Fetch and print registration fields for one user (debug helper)."""
+    try:
+        info = server.getRegistration(uid, ctx)
+    except Exception as e:
+        print(f"  [{label}] getRegistration failed: {e}")
+        return
+
+    print(f"  [{label}]")
+    for key, val in info.items():
+        name = _INFO_NAMES.get(key, str(key))
+        print(f"    {name}: {val!r}")
+
+    # Note fields the server intentionally withholds
+    if MumbleServer.UserInfo.UserPassword not in info:
+        print(f"    UserPassword: (withheld by server — cannot verify via ICE)")
+    if MumbleServer.UserInfo.UserKDFIterations not in info:
+        print(f"    UserKDFIterations: (withheld by server)")
+
+
 # ---------- list servers ----------
 
 def list_servers(meta):
@@ -43,7 +77,7 @@ def list_servers(meta):
 
 # ---------- list users ----------
 
-def list_users(meta, server_id=None, username=None):
+def list_users(meta, server_id=None, username=None, debug=False):
     servers = select_servers(meta, server_id)
     if not servers:
         print("no servers found")
@@ -67,6 +101,9 @@ def list_users(meta, server_id=None, username=None):
                 print(f"{sid}:{uid}:{name}")
             else:
                 print(f"{uid}:{name}")
+
+            if debug:
+                _show_registration(server, uid, "registration")
 
     if username and username != "__ALL__" and not found:
         print(f"user '{username}' not found")
@@ -129,6 +166,42 @@ def reset_user(meta, name, ice_secret, server_id=None):
             return
 
     print(f"user '{name}' not found")
+
+
+def set_password(meta, name, new_password, ice_secret, server_id=None, debug=False):
+    servers = select_servers(meta, server_id)
+    if not servers:
+        print("no servers found")
+        return
+
+    for sid, server in servers:
+        users = server.getRegisteredUsers("")
+        for uid, uname in users.items():
+            if uname != name:
+                continue
+
+            ctx = {"secret": ice_secret}
+
+            if debug:
+                print(f"DEBUG: uid={uid}  name={name!r}")
+                print(f"DEBUG: password being sent to ICE: {new_password!r}  (len={len(new_password)})")
+                _show_registration(server, uid, "before", ctx)
+
+            server.updateRegistration(uid, {
+                MumbleServer.UserInfo.UserPassword: new_password,
+            }, ctx)
+
+            if debug:
+                _show_registration(server, uid, "after", ctx)
+
+            if len(servers) > 1:
+                print(f"{sid}:{uid}:{name}")
+            else:
+                print(f"{uid}:{name}")
+            return
+
+    print(f"user '{name}' not found")
+
 
 def remove_user(meta, name, ice_secret, server_id=None):
     servers = select_servers(meta, server_id)

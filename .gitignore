@@ -1,3 +1,4 @@
+*pycache*
 *.pem
 *.json
 .venv/*

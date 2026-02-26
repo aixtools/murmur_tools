@@ -5,11 +5,12 @@ from configparser import ConfigParser
 from pathlib import Path
 
 MURMUR_INI = Path.home() / "mumble-server/mumble-server.ini"
+MURMUR_INI = Path.home() / "mumble-server.ini"
 
-BASE = Path.home() / "prj/evil-mumble"
-ICE_DIR = BASE / "ice"
+# BASE = "."
+ICE_DIR = "./ice"
 
-sys.path.insert(0, str(BASE))
+# sys.path.insert(0, str(BASE))
 sys.path.insert(0, str(ICE_DIR))
 
 import Ice
@@ -58,7 +59,11 @@ def main():
         print("missing icesecretwrite in murmur ini", file=sys.stderr)
         sys.exit(1)
 
+    print("ICE Secret:[%s]", ice_secret)
+
     ice_secret = ice_secret.strip('"')
+
+    print("ICE Secret:[%s]", ice_secret)
 
     # no args at all → help
     if len(sys.argv) == 1:
