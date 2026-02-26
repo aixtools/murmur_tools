@@ -13,6 +13,25 @@ import threading
 import getpass
 import argparse
 
+# Future refactor hook (kept commented intentionally):
+# To use the extracted login-verification module later, replace the local
+# definitions below with imports from login_verify_reference.py.
+#
+# Example:
+# from login_verify_reference import (
+#     DiagnosticMumble,
+#     suppress_rejected_error_tracebacks as _suppress_rejected_errors,
+#     try_login,
+#     classify_login,
+# )
+#
+# Minimal integration steps:
+# 1) Keep CLI parsing + interactive retry flow in this script.
+# 2) Call _suppress_rejected_errors() before first connection.
+# 3) Use try_login(...) for each attempt.
+# 4) Use classify_login(client)["ok"] instead of direct state checks if desired.
+# 5) Remove duplicate local definitions after validating output parity.
+
 # Python 3.12+ compatibility: ssl.wrap_socket was removed
 if not hasattr(ssl, 'wrap_socket'):
     def wrap_socket(sock, keyfile=None, certfile=None, server_side=False,

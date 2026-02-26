@@ -1,4 +1,6 @@
-*pycache*
+__pycache__/
+*.pv[cod]
 *.pem
 *.json
 .venv/*
+

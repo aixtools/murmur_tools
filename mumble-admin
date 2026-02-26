@@ -4,8 +4,10 @@ import argparse
 from configparser import ConfigParser
 from pathlib import Path
 
-MURMUR_INI = Path.home() / "mumble-server/mumble-server.ini"
-MURMUR_INI = Path.home() / "mumble-server.ini"
+MURMUR_INI_CANDIDATES = [
+    Path.home() / "mumble-server/mumble-server.ini",
+    Path.home() / "mumble-server.ini",
+]
 
 # BASE = "."
 ICE_DIR = "./ice"
@@ -30,6 +32,13 @@ def read_murmur_ini(path):
         cfg.read_string("[murmur]\n" + f.read())
     return cfg["murmur"]
 
+
+def resolve_murmur_ini():
+    for path in MURMUR_INI_CANDIDATES:
+        if path.is_file():
+            return path
+    return None
+
 def prompt_name(action):
     try:
         name = input(f"{action}: username: ").strip()
@@ -52,18 +61,20 @@ def main():
 
     args = parser.parse_args()
 
-    cfg = read_murmur_ini(MURMUR_INI)
+    murmur_ini = resolve_murmur_ini()
+    if murmur_ini is None:
+        tried = ", ".join(str(p) for p in MURMUR_INI_CANDIDATES)
+        print(f"could not find murmur ini (tried: {tried})", file=sys.stderr)
+        sys.exit(1)
+
+    cfg = read_murmur_ini(murmur_ini)
     ice_secret = cfg.get("icesecretwrite", fallback=None)
 
     if not ice_secret:
-        print("missing icesecretwrite in murmur ini", file=sys.stderr)
+        print(f"missing icesecretwrite in murmur ini: {murmur_ini}", file=sys.stderr)
         sys.exit(1)
 
-    print("ICE Secret:[%s]", ice_secret)
-
     ice_secret = ice_secret.strip('"')
-
-    print("ICE Secret:[%s]", ice_secret)
 
     # no args at all → help
     if len(sys.argv) == 1:
